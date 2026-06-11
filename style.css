@@ -687,8 +687,9 @@ header p {
     }
 
     /* 3 PRODUTOS EXIBIDOS LADO A LADO (CLIENTE) */
+   /* Ajuste dinâmico: escolhe 2 ou 3 colunas de forma inteligente dependendo do espaço do celular */
     .products-grid {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
         gap: 0.35rem;
     }
 
@@ -729,9 +730,15 @@ header p {
     }
 
     .add-to-cart-btn {
-        padding: 0.35rem 0.1rem;
-        font-size: 0.7rem;
+        padding: 0.4rem 0.1rem;
+        font-size: 0.72rem;
+        white-space: nowrap;       /* Impede o texto de quebrar em várias linhas verticais */
+        overflow: hidden;          /* Esconde qualquer sobra de texto */
+        text-overflow: ellipsis;   /* Se o texto for muito longo para o botão, coloca "..." sutilmente */
         border-radius: 4px;
+        display: block;
+        width: 100%;
+        text-align: center;
     }
 
     /* ==========================================
