@@ -1,0 +1,236 @@
+<!-- admin.html -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Administrativo - Loja Ebenezzer</title>
+    <link rel="stylesheet" href="style.css">
+    <meta name="referrer" content="no-referrer">
+    <style>
+        /* Estilos adicionais */
+        .login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+        .login-box {
+            background-color: var(--card-bg);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            width: 95%;
+            max-width: 400px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+        .logout-btn {
+            background-color: #ef4444;
+            color: white;
+            padding: 0.4rem 0.8rem;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.8rem;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            transition: var(--transition);
+        }
+        .logout-btn:hover {
+            opacity: 0.9;
+        }
+        /* Estilo do badge de notificação */
+        .notification-badge {
+            background-color: #ef4444;
+            color: white;
+            font-size: 0.75rem;
+            padding: 2px 7px;
+            border-radius: 50%;
+            margin-left: 0.3rem;
+            font-weight: bold;
+            display: none; /* Só exibe se houver vendas abertas */
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TELA DE LOGIN (Aparece se o usuário não estiver logado) -->
+    <div id="login-screen" class="login-screen" style="display: flex;">
+        <div class="login-box">
+            <h2 style="color: var(--accent-color); margin-bottom: 0.5rem; text-transform: uppercase;">Acesso Restrito</h2>
+            <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 1.5rem;">Identifique-se para gerenciar a Loja Ebenezzer</p>
+            
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="form-group" style="text-align: left;">
+                    <label for="login-email">E-mail</label>
+                    <input type="email" id="login-email" placeholder="admin@lojaebenezzer.com" required>
+                </div>
+                <div class="form-group" style="text-align: left;">
+                    <label for="login-pass">Senha</label>
+                    <input type="password" id="login-pass" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn-submit" style="margin-top: 1rem;">Entrar no Painel</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- CONTEÚDO DO PAINEL (Só carrega após login) -->
+    <div id="admin-content" style="display: none;">
+        <header>
+            <h1>Painel Admin - Loja Ebenezzer</h1>
+            <p>Gerencie produtos, classificações, estoque e finanças da loja</p>
+            <button class="logout-btn" onclick="handleLogout()">Sair do Painel</button>
+        </header>
+
+        <div class="container">
+            <!-- Navegação de Abas -->
+            <div class="admin-nav">
+                <button class="nav-tab active" id="tab-stock-btn" onclick="switchTab('stock')">Estoque de Produtos</button>
+                <button class="nav-tab" id="tab-open-sales-btn" onclick="switchTab('open-sales')">
+                    Vendas Abertas <span class="notification-badge" id="open-sales-badge">0</span>
+                </button>
+                <button class="nav-tab" id="tab-history-btn" onclick="switchTab('history')">Histórico de Vendas</button>
+                <button class="nav-tab" id="tab-cash-btn" onclick="switchTab('cash')">Caixa da Loja</button>
+            </div>
+
+            <!-- Seção do Estoque -->
+            <div id="section-stock" class="admin-layout">
+                <div class="form-section">
+                    <h2 id="form-title" style="margin-bottom: 1rem; color: white;">Cadastrar Produto</h2>
+                    <form id="product-form" onsubmit="handleProductSubmit(event)">
+                        <input type="hidden" id="prod-id">
+                        
+                        <div class="form-group">
+                            <label for="code">Código do Produto</label>
+                            <input type="text" id="code" placeholder="Ex: BIB-10, LIV-05" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="title">Nome do Produto</label>
+                            <input type="text" id="title" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="category">Classificação (Categoria)</label>
+                            <select id="category" required>
+                                <option value="Bíblia">Bíblia</option>
+                                <option value="Bíblia de Estudo">Bíblia de Estudo</option>
+                                <option value="Livros">Livros</option>
+                                <option value="Escola Bíblica">Escola Bíblica</option>
+                                <option value="Outros">Outros</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="price">Preço Original (R$)</label>
+                            <input type="number" step="0.01" id="price" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="discountPrice">Preço Promocional (R$ - opcional)</label>
+                            <input type="number" step="0.01" id="discountPrice" placeholder="Deixe em branco ou zero se sem desconto">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="stock">Quantidade em Estoque</label>
+                            <input type="number" id="stock" min="0" placeholder="Ex: 10, 50" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="desc">Descrição do Item</label>
+                            <textarea id="desc" rows="3" required></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="img-file">Imagem do Produto (Anexar do Dispositivo)</label>
+                            <input type="file" id="img-file" accept="image/*" onchange="handleImageUpload(event)">
+                            <input type="hidden" id="img">
+                            <div id="img-preview-container" style="margin-top: 0.8rem; display: none; text-align: center;">
+                                <p style="font-size: 0.75rem; color: var(--accent-color); margin-bottom: 0.3rem;">Pré-visualização:</p>
+                                <img id="img-preview" src="" style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px; border: 1.5px solid var(--accent-color); margin: 0 auto;">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn-submit" id="btn-save">Salvar Produto</button>
+                        <button type="button" class="btn-submit" id="btn-cancel" style="background-color: #64748b; display: none;" onclick="resetForm()">Cancelar</button>
+                    </form>
+                </div>
+
+                <div>
+                    <!-- NOVO: Título e Botão de Gerar Folder Lado a Lado -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; flex-wrap: wrap; gap: 0.5rem;">
+                        <h2 style="color: white; margin: 0;">Produtos em Estoque</h2>
+                        <button class="action-btn btn-pdf" style="padding: 0.5rem 1rem;" onclick="generateCatalogFolder()">Gerar Folder de Ofertas</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Código / Nome</th>
+                                    <th>Classificação</th>
+                                    <th>Preços</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-product-rows"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NOVA SEÇÃO: Vendas Abertas (Aguardando Concretização) -->
+            <div id="section-open-sales" style="display: none;">
+                <h2 style="color: white; margin-bottom: 1rem;">Vendas Aguardando Faturamento</h2>
+                <div id="open-sales-container"></div>
+            </div>
+
+            <!-- Seção do Histórico de Vendas Concluídas -->
+            <div id="section-history" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; gap: 0.5rem; flex-wrap: wrap;">
+                    <h2 style="color: white; font-size: 1.3rem;">Histórico de Compras (Concluídas)</h2>
+                    <button class="action-btn btn-delete" onclick="clearHistory()">Limpar Histórico</button>
+                </div>
+                <div id="history-container"></div>
+            </div>
+
+            <!-- Seção: Caixa da Loja -->
+            <div id="section-cash" style="display: none;">
+                <h2 style="color: white; margin-bottom: 1rem;">Caixa da Loja - Consolidação Mensal (Somente Vendas Concluídas)</h2>
+                <div class="table-responsive">
+                    <table class="admin-table" style="min-width: 320px;">
+                        <thead>
+                            <tr>
+                                <th>Período (Mês / Ano)</th>
+                                <th style="text-align: right;">Entradas Totais (R$)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-cash-rows"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Contêiner invisível para exportação do folder como imagem de alta resolução -->
+    <div id="folder-export-area" style="position: absolute; left: -9999px; top: 0; width: 1080px; padding: 40px; background-color: #040d1a; box-sizing: border-box;">
+        <!-- O conteúdo do folder será inserido aqui dinamicamente pelo JS antes de baixar -->
+    </div>
+    <!-- O html2canvas DEVE vir antes do admin.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <!-- Bibliotecas do Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    
+    <!-- Configuração do banco e lógica -->
+    <script src="firebase-config.js"></script>
+    <script src="admin.js"></script>
+</body>
+</html>
