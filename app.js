@@ -46,7 +46,7 @@ function renderProducts(productsList) {
         
         const buttonHtml = outOfStock 
             ? `<button class="add-to-cart-btn" style="background-color: #475569; color: #94a3b8; cursor: not-allowed;" disabled>Esgotado</button>`
-            : `<button class="add-to-cart-btn" onclick="addToCart('${prod.id}')">Adicionar ao Carrinho</button>`;
+            : `<button class="add-to-cart-btn" onclick="addToCart('${prod.id}')">Adicionar</button>`;
 
         const stockMessage = outOfStock 
             ? `<span style="color: #ef4444; font-weight: bold; font-size: 0.65rem;">Indisponível</span>`
