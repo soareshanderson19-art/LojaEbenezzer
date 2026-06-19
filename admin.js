@@ -619,3 +619,285 @@ function clearHistory() {
         });
     }
 }
+
+// ==========================================
+// IMPORTAÇÃO DE PLANILHA EXCEL (.XLSX)
+// ==========================================
+
+function triggerExcelUpload() {
+    document.getElementById("excel-file-input").click();
+}
+
+function handleExcelImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const statusDiv = document.getElementById("import-status");
+    statusDiv.innerText = "Lendo arquivo...";
+    statusDiv.style.display = "block";
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            // raw: true impede que a biblioteca converta textos com vírgula em números errados
+            const workbook = XLSX.read(data, { type: 'array', raw: true });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            
+            processExcelData(jsonData);
+        } catch (error) {
+            console.error("Erro ao ler arquivo Excel:", error);
+            alert("Erro ao processar o arquivo Excel. Verifique se o arquivo está corrompido ou formato incorreto.");
+            statusDiv.style.display = "none";
+        }
+    };
+    reader.onerror = function() {
+        alert("Erro ao ler o arquivo do dispositivo.");
+        statusDiv.style.display = "none";
+    };
+    reader.readAsArrayBuffer(file);
+    
+    // Reseta o valor do input para permitir fazer upload do mesmo arquivo logo em seguida
+    event.target.value = "";
+}
+
+function normalizeHeader(str) {
+    if (!str) return "";
+    return String(str)
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+        .trim()
+        .replace(/\s+/g, "_")            // Substitui espaços por underline
+        .replace(/[^a-z0-9_]/g, "");     // Mantém apenas letras, números e underline
+}
+
+function parsePrice(value) {
+    if (value === undefined || value === null) return 0;
+    if (typeof value === 'number') return value;
+    
+    let str = String(value).replace("R$", "").replace(/\s/g, "");
+    if (str === "") return 0;
+    
+    const hasDot = str.includes(".");
+    const hasComma = str.includes(",");
+    
+    if (hasDot && hasComma) {
+        const dotIndex = str.indexOf(".");
+        const commaIndex = str.indexOf(",");
+        if (commaIndex > dotIndex) {
+            // Formato BR (ex: 1.200,50) -> remove pontos, troca vírgula por ponto
+            str = str.replace(/\./g, "").replace(",", ".");
+        } else {
+            // Formato US (ex: 1,200.50) -> remove vírgulas
+            str = str.replace(/,/g, "");
+        }
+    } else if (hasComma) {
+        // Apenas vírgula (ex: 199,99) -> substitui por ponto
+        str = str.replace(",", ".");
+    } else if (hasDot) {
+        // Apenas ponto (ex: 199.99 ou 1.200)
+        // Se houver exatamente 3 dígitos após o ponto, assume que é separador de milhar (ex: 1.200 -> 1200)
+        const parts = str.split(".");
+        if (parts.length === 2 && parts[1].length === 3) {
+            str = str.replace(".", "");
+        }
+    }
+    
+    const parsed = parseFloat(str);
+    return isNaN(parsed) ? 0 : parsed;
+}
+
+function processExcelData(rows) {
+    const statusDiv = document.getElementById("import-status");
+    if (rows.length < 2) {
+        alert("A planilha está vazia ou não possui cabeçalhos.");
+        statusDiv.style.display = "none";
+        return;
+    }
+    
+    const headers = rows[0].map(h => normalizeHeader(h));
+    
+    // Mapeamento dinâmico dos cabeçalhos suportados para os campos oficiais do Firestore
+    const fieldMap = {};
+    headers.forEach((header, index) => {
+        if (header === "codigo" || header === "code" || header === "cod") {
+            fieldMap[index] = "code";
+        } else if (header === "titulo" || header === "title" || header === "nome") {
+            fieldMap[index] = "title";
+        } else if (header === "categoria" || header === "category" || header === "classificacao") {
+            fieldMap[index] = "category";
+        } else if (header === "preco" || header === "price" || header === "preco_original") {
+            fieldMap[index] = "price";
+        } else if (header === "preco_promocional" || header === "discountprice" || header === "desconto" || header === "preco_desconto") {
+            fieldMap[index] = "discountPrice";
+        } else if (header === "estoque" || header === "stock" || header === "quantidade" || header === "qtd") {
+            fieldMap[index] = "stock";
+        } else if (header === "descricao" || header === "desc" || header === "sinopse" || header === "detalhes") {
+            fieldMap[index] = "desc";
+        } else if (header === "imagem" || header === "img" || header === "foto" || header === "url") {
+            fieldMap[index] = "img";
+        }
+    });
+
+    // Validar se as colunas mínimas essenciais foram mapeadas
+    const mappedFields = Object.values(fieldMap);
+    if (!mappedFields.includes("code") || !mappedFields.includes("title")) {
+        alert("Erro na Planilha: Não encontramos as colunas de identificação obrigatórias.\n\nCertifique-se de ter pelo menos uma coluna chamada 'codigo' (ou 'code') e outra 'titulo' (ou 'nome').");
+        statusDiv.style.display = "none";
+        return;
+    }
+
+    const importedProducts = [];
+    
+    // Mapeia as linhas de dados (começando da linha index 1, pois index 0 são os cabeçalhos)
+    for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.length === 0) continue;
+        
+        // Verifica se a linha tem dados válidos (evita cadastrar produtos sem código/título)
+        const codeIndex = headers.findIndex(h => h === "codigo" || h === "code" || h === "cod");
+        const titleIndex = headers.findIndex(h => h === "titulo" || h === "title" || h === "nome");
+        
+        // Pula linhas que não tenham dados básicos
+        if (codeIndex !== -1 && (row[codeIndex] === undefined || row[codeIndex] === null || String(row[codeIndex]).trim() === "")) {
+            continue;
+        }
+        if (titleIndex !== -1 && (row[titleIndex] === undefined || row[titleIndex] === null || String(row[titleIndex]).trim() === "")) {
+            continue;
+        }
+
+        const prod = {
+            code: "",
+            title: "",
+            category: "Outros",
+            price: 0,
+            discountPrice: 0,
+            stock: 0,
+            desc: "",
+            img: ""
+        };
+
+        row.forEach((value, index) => {
+            const field = fieldMap[index];
+            if (!field || value === undefined || value === null) return;
+
+            if (field === "price" || field === "discountPrice") {
+                const parsed = parsePrice(value);
+                console.log(`[Import Excel Debug] Campo: ${field} | Valor Original:`, value, `| Tipo:`, typeof value, `| Parsed:`, parsed);
+                prod[field] = parsed;
+            } else if (field === "stock") {
+                const parsed = parseInt(value, 10);
+                prod[field] = isNaN(parsed) ? 0 : parsed;
+            } else if (field === "code") {
+                prod[field] = String(value).trim().toUpperCase();
+            } else {
+                prod[field] = String(value).trim();
+            }
+        });
+
+        // Validação e normalização da categoria para as permitidas na loja
+        const validCategories = ["Bíblia", "Bíblia de Estudo", "Livros", "Escola Bíblica", "Outros"];
+        const normalizedCat = normalizeHeader(prod.category);
+        let matchedCategory = "Outros";
+        for (const validCat of validCategories) {
+            if (normalizeHeader(validCat) === normalizedCat) {
+                matchedCategory = validCat;
+                break;
+            }
+        }
+        prod.category = matchedCategory;
+
+        if (prod.title && prod.code) {
+            importedProducts.push(prod);
+        }
+    }
+
+    if (importedProducts.length === 0) {
+        alert("Nenhum produto válido para importação foi encontrado na planilha.");
+        statusDiv.style.display = "none";
+        return;
+    }
+
+    statusDiv.style.display = "none";
+    if (confirm(`Encontrados ${importedProducts.length} produtos válidos na planilha.\n\nDeseja importá-los para o banco de dados da loja?\n(Produtos com o mesmo código serão atualizados mantendo imagens antigas caso a planilha venha em branco)`)) {
+        uploadProductsToFirestore(importedProducts);
+    }
+}
+
+function uploadProductsToFirestore(importedProducts) {
+    const statusDiv = document.getElementById("import-status");
+    statusDiv.innerText = "Preparando gravação em lote...";
+    statusDiv.style.display = "block";
+
+    let createdCount = 0;
+    let updatedCount = 0;
+    
+    // Divide os produtos em pacotes (chunks) de até 400 itens para respeitar o limite de 500 do Batch do Firestore
+    const chunks = [];
+    const CHUNK_SIZE = 400;
+    for (let i = 0; i < importedProducts.length; i += CHUNK_SIZE) {
+        chunks.push(importedProducts.slice(i, i + CHUNK_SIZE));
+    }
+
+    let chunkIndex = 0;
+
+    function processNextChunk() {
+        if (chunkIndex >= chunks.length) {
+            statusDiv.innerText = `Sucesso: ${createdCount} criados, ${updatedCount} atualizados!`;
+            alert(`Importação finalizada!\n\n- Novos produtos adicionados: ${createdCount}\n- Produtos existentes atualizados: ${updatedCount}`);
+            setTimeout(() => {
+                statusDiv.style.display = "none";
+            }, 5000);
+            return;
+        }
+
+        const currentChunk = chunks[chunkIndex];
+        const batch = db.batch();
+
+        currentChunk.forEach(importedProd => {
+            // Busca se o produto já existe no cache em memória 'products' carregado do Firestore
+            const existing = products.find(p => p.code === importedProd.code);
+            let docId;
+            
+            if (existing) {
+                docId = existing.id;
+                // Mescla dados: se na planilha o campo estiver vazio, preserva o valor atual do banco
+                if (!importedProd.img && existing.img) importedProd.img = existing.img;
+                if (!importedProd.desc && existing.desc) importedProd.desc = existing.desc;
+                if (importedProd.price === 0 && existing.price) importedProd.price = existing.price;
+                if (importedProd.discountPrice === 0 && existing.discountPrice) importedProd.discountPrice = existing.discountPrice;
+                if (importedProd.stock === 0 && existing.stock) importedProd.stock = existing.stock;
+                if (importedProd.category === "Outros" && existing.category && existing.category !== "Outros") {
+                    importedProd.category = existing.category;
+                }
+                updatedCount++;
+            } else {
+                // Gera ID único se for produto novo
+                docId = Date.now().toString() + "_" + Math.random().toString(36).substr(2, 5);
+                createdCount++;
+            }
+
+            const docRef = db.collection("produtos").doc(docId);
+            batch.set(docRef, importedProd);
+        });
+
+        statusDiv.innerText = `Gravando lote ${chunkIndex + 1} de ${chunks.length} (${chunkIndex * CHUNK_SIZE + currentChunk.length} produtos)...`;
+
+        batch.commit()
+            .then(() => {
+                chunkIndex++;
+                // Aguarda um pequeno delay de 100ms para evitar gargalo e processa o próximo chunk
+                setTimeout(processNextChunk, 100);
+            })
+            .catch(err => {
+                console.error("Erro ao gravar lote no Firestore:", err);
+                alert("Ocorreu um erro ao salvar o lote de produtos no Firestore. Processo interrompido.");
+                statusDiv.innerText = "Erro na gravação.";
+            });
+    }
+
+    processNextChunk();
+}
