@@ -167,7 +167,12 @@
                     <!-- NOVO: Título e Botão de Gerar Folder Lado a Lado -->
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; flex-wrap: wrap; gap: 0.5rem;">
                         <h2 style="color: white; margin: 0;">Produtos em Estoque</h2>
-                        <button class="action-btn btn-pdf" style="padding: 0.5rem 1rem;" onclick="generateCatalogFolder()">Gerar Folder de Ofertas</button>
+                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                            <button class="action-btn btn-excel" style="padding: 0.5rem 1rem;" onclick="triggerExcelUpload()">Importar Planilha</button>
+                            <button class="action-btn btn-pdf" style="padding: 0.5rem 1rem;" onclick="generateCatalogFolder()">Gerar Folder de Ofertas</button>
+                            <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" style="display: none;" onchange="handleExcelImport(event)">
+                        </div>
+                        <div id="import-status" style="display: none; font-size: 0.8rem; color: var(--accent-color); font-weight: bold; width: 100%; text-align: right; margin-top: 0.3rem;"></div>
                     </div>
                     <div class="table-responsive">
                         <table class="admin-table">
@@ -221,6 +226,8 @@
     <div id="folder-export-area" style="position: absolute; left: -9999px; top: 0; width: 1080px; padding: 40px; background-color: #040d1a; box-sizing: border-box;">
         <!-- O conteúdo do folder será inserido aqui dinamicamente pelo JS antes de baixar -->
     </div>
+    <!-- Biblioteca SheetJS para processar Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <!-- O html2canvas DEVE vir antes do admin.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
