@@ -633,6 +633,7 @@ header p {
 .btn-edit { background-color: #3b82f6; color: white; }
 .btn-delete { background-color: #ef4444; color: white; margin-left: 0.1rem; }
 .btn-pdf { background-color: var(--accent-color); color: var(--primary-color); }
+.btn-excel { background-color: #10b981; color: white; }
 
 .history-card {
     background-color: rgba(13, 30, 54, 0.85);
@@ -849,7 +850,7 @@ header p {
         padding: 0.4rem 0.8rem;
         font-size: 0.8rem;
     }
-}
+
 /* Estilo da Barra de Busca do Cliente */
 .search-container {
     width: 100%;
